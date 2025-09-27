@@ -1,6 +1,6 @@
 # 🐚 Shell Configuration
 
-This repository contains my personal shell configuration for **Zsh**, designed to be portable across local development (macOS, Ghostty, iTerm2) and HPC environments (e.g., NYU Big Purple). It uses modern tools like **Antidote**, **Starship**, and **fzf** to provide a fast, reproducible setup.
+This repository contains my personal shell configuration for **Zsh**, designed to be portable across local development and HPC environments. It uses modern tools like **Antidote**, **Starship**, and **fzf** to provide a fast, reproducible setup.
 
 ---
 
