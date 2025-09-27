@@ -1,0 +1,74 @@
+# ~/.zsh_functions
+# Purpose: Interactive utilities for HPC and local dev.
+# Load: sourced by ~/.zshrc
+# Conventions:
+# - Zsh-only: each function begins with `emulate -L zsh` and local options.
+# - Docs: `##` docblocks above each function; use `zfunchelp` to view.
+# - Return non-zero on misuse; print errors to stderr (print -u2).
+
+# Quick ping to confirm the file is loaded
+zfunc_ping() { emulate -L zsh; print "zsh functions loaded ✅"; }
+
+# Show docs for a function, or list all documented functions.
+zfunchelp() {
+  emulate -L zsh
+  setopt localoptions pipe_fail
+
+  local fn="${1:-}"
+  local file="$HOME/.zsh_functions"   # adjust if you store functions elsewhere
+
+  if [[ -z "$fn" ]]; then
+    # List Name + Usage for all functions
+    awk '
+      /^## Name:/  {name=$0}
+      /^## Usage:/ {usage=$0; if (name!="") {print substr(name,4) ORS substr(usage,4) ORS; name=""; usage=""}}
+    ' "$file"
+    return
+  fi
+
+  # Show the docblock immediately preceding the given function
+  awk -v target="$fn" '
+    # Accumulate a docblock when we see lines starting with "## "
+    /^## / {
+      if (!inblock) { block="" }
+      inblock=1
+      block = block $0 ORS
+      next
+    }
+
+    # Any non-## line ends the current docblock; remember it as the last one seen
+    inblock && !/^## / {
+      inblock=0
+      lastblock = block
+      block = ""
+    }
+
+    # Function definition line:  (optional leading spaces) name () {
+    # Match both "name()" and "name ()", and allow trailing spaces before "{"
+    /^[[:space:]]*[A-Za-z_][A-Za-z0-9_+-]*[[:space:]]*\(\)[[:space:]]*\{/ {
+      line = $0
+      name = line
+      sub(/[[:space:]]*\(.*/, "", name)   # strip from first "("
+      sub(/^[[:space:]]+/, "", name)      # trim leading spaces
+      if (name == target) {
+        print lastblock
+        exit
+      }
+    }
+  ' "$file" | sed 's/^## //'
+}
+
+## Name: refresh-completions — rebuild zsh completion cache
+## Usage: refresh-completions
+## Examples:
+##   refresh-completions
+refresh-completions() {
+  emulate -L zsh
+  setopt localoptions pipe_fail
+  local dumpfile="${XDG_CACHE_HOME:-$HOME/.cache}/zsh/zcompdump"
+  print "Refreshing Zsh completion cache at: $dumpfile"
+  command rm -f -- "$dumpfile"
+  autoload -Uz compinit
+  compinit -i -C -d "$dumpfile"
+  print "Done."
+}
