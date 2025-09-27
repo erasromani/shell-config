@@ -108,7 +108,7 @@ Next steps:
 - Open a new shell, or run:  source ~/.zshrc
 - If starship isn't detected, ensure ~/.local/bin is on your PATH.
 
-Tip: re-run this script anytime; it safely updates what’s already installed.
+Tip: re-run this script anytime; it safely updates what's already installed.
 INFO
 }
 
