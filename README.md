@@ -21,6 +21,14 @@ This repository contains my personal shell configuration for **Zsh**, designed t
 
   Appends helpful snippets to your `~/.zshrc`.
 
+- **`setup_dev_min.sh`**  
+  Combined installer for Starship, fzf, Antidote, and the latest stable Neovim build.
+
+  - Installs tools under `~/.local`
+  - Builds Neovim from source (resolves GLIBC/FUSE issues on HPC clusters)
+  - Symlinks `nvim` into `~/.local/bin`
+  - Does **not** modify `.zshrc`
+
 - **`.zshrc`**  
   Interactive shell configuration.
 
@@ -77,6 +85,8 @@ This repository contains my personal shell configuration for **Zsh**, designed t
 
    ```bash
    ./install_cli_tools.sh --write-zshrc
+   # or, for full setup including Neovim:
+   ./setup_dev_min.sh
    ```
 
 3. Restart your shell (or `source ~/.zshrc`).
@@ -86,6 +96,7 @@ This repository contains my personal shell configuration for **Zsh**, designed t
 ## 🛠 Updating
 
 - Re-run `install_cli_tools.sh` anytime to update Starship, fzf, or Antidote.
+- Re-run `setup_dev_min.sh` to rebuild/update Neovim along with the CLI tools.
 - Plugins can be updated with:
   ```bash
   antidote update
