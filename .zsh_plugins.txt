@@ -1,0 +1,19 @@
+# ─────────────────────────────────────────────────────────────
+# Antidote plugin bundle (recommended minimal set)
+# Order matters! Completions → suggestions/search → highlighting last
+# ─────────────────────────────────────────────────────────────
+
+# 1) Extra completions (load first)
+zsh-users/zsh-completions
+
+# 2) Navigation helper (fzf-powered interactive cd)
+changyuheng/zsh-interactive-cd
+
+# 3) History tools
+zsh-users/zsh-history-substring-search
+
+# 4) Suggestions (near the end)
+zsh-users/zsh-autosuggestions
+
+# 5) Syntax highlighting (ABSOLUTELY last)
+zsh-users/zsh-syntax-highlighting
