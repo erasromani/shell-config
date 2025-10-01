@@ -25,10 +25,13 @@ command -v starship >/dev/null 2>&1 && eval "$(starship init zsh)"
 
 # ── History-substring-search keybinds (guarded) ───────────────────────────────
 if (( $+functions[history-substring-search-up] )); then
-  # use terminfo so it works across Ghostty/iTerm/tmux
-  bindkey "${terminfo[kcuu1]}" history-substring-search-up
-  bindkey "${terminfo[kcud1]}" history-substring-search-down
+  bindkey '^[[A' history-substring-search-up
+  bindkey '^[[B' history-substring-search-down
 fi
+
+# ── Make Ctrl+A / Ctrl+E work everywhere in Zsh ───────────────────────────────
+# Use Emacs keymap (expected Ctrl+A/Ctrl+E behavior)
+bindkey -e
 
 # ── Optional: iTerm2 integration (safe no-op elsewhere) ───────────────────────
 [ -f "${HOME}/.iterm2_shell_integration.zsh" ] && source "${HOME}/.iterm2_shell_integration.zsh"
