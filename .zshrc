@@ -1,3 +1,7 @@
+# ── Make Ctrl+A / Ctrl+E work everywhere in Zsh ───────────────────────────────
+# Use Emacs keymap (expected Ctrl+A/Ctrl+E behavior)
+bindkey -e
+
 # ── Antidote plugin manager ────────────────────────────────────────────────────
 # (Make sure you have ~/.zsh_plugins.txt; Antidote will read it by default.)
 if [ -r "${ZDOTDIR:-$HOME}/.antidote/antidote.zsh" ]; then
@@ -5,6 +9,9 @@ if [ -r "${ZDOTDIR:-$HOME}/.antidote/antidote.zsh" ]; then
   # Load plugins now so fpath is set BEFORE we initialize completion
   antidote load
 fi
+
+# ── fzf extras (keybindings/completion) if installed ──────────────────────────
+[ -f "$HOME/.fzf.zsh" ] && source "$HOME/.fzf.zsh"
 
 # ── Completions: one-call, cached, secure-ish ─────────────────────────────────
 # Use an XDG cache location and avoid noisy insecure-dir warnings on HPC
@@ -16,9 +23,6 @@ compinit -i -C -d "${XDG_CACHE_HOME:-$HOME/.cache}/zsh/zcompdump"
 # ── Prompt (Starship) ─────────────────────────────────────────────────────────
 command -v starship >/dev/null 2>&1 && eval "$(starship init zsh)"
 
-# ── fzf extras (keybindings/completion) if installed ──────────────────────────
-[ -f "$HOME/.fzf.zsh" ] && source "$HOME/.fzf.zsh"
-
 # ── Aliases / Functions split files ───────────────────────────────────────────
 [ -f "$HOME/.zsh_aliases" ]   && source "$HOME/.zsh_aliases"
 [ -f "$HOME/.zsh_functions" ] && source "$HOME/.zsh_functions"
@@ -28,10 +32,6 @@ if (( $+functions[history-substring-search-up] )); then
   bindkey '^[[A' history-substring-search-up
   bindkey '^[[B' history-substring-search-down
 fi
-
-# ── Make Ctrl+A / Ctrl+E work everywhere in Zsh ───────────────────────────────
-# Use Emacs keymap (expected Ctrl+A/Ctrl+E behavior)
-bindkey -e
 
 # ── Optional: iTerm2 integration (safe no-op elsewhere) ───────────────────────
 [ -f "${HOME}/.iterm2_shell_integration.zsh" ] && source "${HOME}/.iterm2_shell_integration.zsh"
