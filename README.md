@@ -141,29 +141,44 @@ require("lazy").setup({
   { "L3MON4D3/LuaSnip" },
   { "saadparwaiz1/cmp_luasnip" },
   { "williamboman/mason.nvim" },
-  { "williamboman/mason-lspconfig.nvim" },
+  { "WhoIsSethDaniel/mason-tool-installer.nvim" },
+  { "stevearc/conform.nvim" },
 })
 ```
 
 ### 🧠 Language Support
 
-The setup supports:
+The setup supports modern LSP and linting tools that run fully in user space:
 
-- **Python:** Pyright (LSP), Black, isort, and Mypy via Mason.
-- **C/C++:** Clangd and Clang-Format.
+- **Python:**
+  - **BasedPyright** — type checking and completions (no Node/npm required)
+  - **Ruff (built-in LSP)** — linting and quick fixes (`ruff server`)
+  - **Black + isort** — formatting
+  - **Mypy** — type-checking (optional, via `nvim-lint`)
+- **C/C++:**
+  - **Clangd** (LSP)
+  - **Clang-Format** (formatter)
 
-All are installed automatically on first launch via Mason:
-
-```
-:Mason
-```
-
-You can also install them manually:
+All tools are installed automatically via Mason or manually with:
 
 ```bash
-pip install --user black isort mypy
-npm i -g pyright
+pip install --user basedpyright ruff black isort mypy
 conda install -c conda-forge clang clang-tools
+```
+
+Example LSP configuration snippet:
+
+```lua
+-- Python LSPs
+vim.lsp.config("basedpyright", { cmd = { "basedpyright-langserver", "--stdio" } })
+vim.lsp.enable("basedpyright")
+
+vim.lsp.config("ruff", { cmd = { "ruff", "server" } })
+vim.lsp.enable("ruff")
+
+-- C/C++ LSP
+vim.lsp.config("clangd", { cmd = { "clangd" } })
+vim.lsp.enable("clangd")
 ```
 
 ### 🎨 Theme
@@ -236,5 +251,3 @@ Ctrl+b Shift+I
 
 Starship prompt + autosuggestions + syntax highlighting + fzf + Neovim + tmux (Catppuccin Mocha) =  
 a cohesive, modern, and portable developer environment ✨
-
----

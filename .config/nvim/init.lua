@@ -70,16 +70,16 @@ require("nvim-treesitter.configs").setup({
 require("mason").setup()
 require("mason-tool-installer").setup({
   ensure_installed = {
-    -- LSPs
-    "pyright",
+    -- LSPs / servers
     "clangd",
+    "basedpyright",
+    "ruff",          -- native Ruff LSP (ruff server)
     -- Formatters
     "black",
     "isort",
     "clang-format",
     -- Linters / type-checkers
     "mypy",
-    "flake8",
   },
   run_on_start = true,
   auto_update = false,
@@ -109,19 +109,31 @@ local capabilities = require("cmp_nvim_lsp").default_capabilities()
 
 -----------------------------------------------------------
 -- LSP (Neovim 0.11+ API)
--- Python: pyright
+-- Python: BasedPyright (types), Ruff (lint)
 -- C/C++ : clangd
 -----------------------------------------------------------
--- Python (pyright)
-vim.lsp.config("pyright", {
+-- Python: BasedPyright (no Node/npm)
+vim.lsp.config("basedpyright", {
   capabilities = capabilities,
-  cmd = { "pyright-langserver", "--stdio" },
-  filetypes = { "python" },
-  root_markers = { "pyproject.toml","setup.py","setup.cfg","requirements.txt",".git" },
+  cmd = { "basedpyright-langserver", "--stdio" }, -- ensure it's on PATH or set full path
 })
-vim.lsp.enable("pyright")
+vim.lsp.enable("basedpyright")
 
--- C/C++ (clangd)
+-- Python: Ruff native LSP (ruff server)
+vim.lsp.config("ruff", {
+  capabilities = capabilities,
+  cmd = { "ruff", "server" }, -- requires recent ruff
+  -- Optional: pass settings/init_options here if you don't have a ruff.toml/pyproject
+  -- init_options = {
+  --   settings = {
+  --     format = { line_length = 88 },
+  --     lint = { select = { "E","F","W" }, ignore = { "F401" } },
+  --   },
+  -- },
+})
+vim.lsp.enable("ruff")
+
+-- C/C++: clangd
 vim.lsp.config("clangd", {
   capabilities = capabilities,
   cmd = { "clangd" },
@@ -137,7 +149,6 @@ require("conform").setup({
   notify_on_error = false,
   format_on_save = function(bufnr)
     local ft = vim.bo[bufnr].filetype
-    -- enable on-save formatting for these filetypes
     if ft == "python" or ft == "c" or ft == "cpp" then
       return { timeout_ms = 3000, lsp_fallback = true }
     end
@@ -157,14 +168,14 @@ vim.keymap.set({ "n", "v" }, "<leader>f", function() require("conform").format({
 
 -----------------------------------------------------------
 -- Linting / Type-check (nvim-lint) — mypy for Python
+-- (Ruff handles linting via its LSP; keep mypy for types if desired)
 -----------------------------------------------------------
 local lint = require("lint")
 lint.linters_by_ft = {
-  python = { "flake8", "mypy" },
+  python = { "mypy" },
 }
 -- If mypy is in a non-standard path, you can set:
--- lint.linters.mypy.cmd = "/path/to/mypy"
--- Run lint on save/enter
+-- lint.linters.mypy.cmd = vim.fn.expand("~/.local/bin/mypy")
 vim.api.nvim_create_autocmd({ "BufEnter", "BufWritePost" }, {
   callback = function() require("lint").try_lint() end,
 })
