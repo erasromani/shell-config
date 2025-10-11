@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# setup_dev_min.sh — Starship, fzf, Antidote, and latest-stable Neovim (build from source).
+# setup_dev_min.sh — Starship, fzf, Antidote, latest-stable Neovim (build from source), and TPM.
 # No .zshrc edits. Safe to re-run.
 set -euo pipefail
 
@@ -7,6 +7,11 @@ PREFIX="${HOME}/.local"
 BIN_DIR="${PREFIX}/bin"
 FZF_DIR="${HOME}/.fzf"
 ANTIDOTE_DIR="${ZDOTDIR:-$HOME}/.antidote"
+
+# Tmux (XDG) locations
+TMUX_XDG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/tmux"
+TMUX_PLUGINS_DIR="${TMUX_XDG_DIR}/plugins"
+TPM_DIR="${TMUX_PLUGINS_DIR}/tpm"
 
 mkdir -p "$BIN_DIR"
 
@@ -64,6 +69,30 @@ install_antidote() {
   log "Antidote installed."
 }
 
+# --- TPM (Tmux Plugin Manager) ---
+install_tpm() {
+  if ! have git; then
+    warn "git not found; cannot install TPM."
+    return
+  fi
+  mkdir -p "$TMUX_PLUGINS_DIR"
+  if [[ -d "$TPM_DIR/.git" ]]; then
+    log "Updating TPM in $TPM_DIR ..."
+    git -C "$TPM_DIR" pull --ff-only || warn "TPM update skipped."
+  else
+    log "Installing TPM to $TPM_DIR ..."
+    git clone --depth=1 https://github.com/tmux-plugins/tpm "$TPM_DIR"
+  fi
+  log "TPM ready."
+
+  # Gentle reminder if tmux.conf exists but lacks the init line
+  local TMUX_CONF="${TMUX_XDG_DIR}/tmux.conf"
+  if [[ -f "$TMUX_CONF" ]] && ! grep -q "plugins/tpm/tpm" "$TMUX_CONF"; then
+    warn "Add this to the END of $TMUX_CONF:"
+    printf "    run '%s/tpm'\n" "$TPM_DIR"
+  fi
+}
+
 # --- Neovim (build latest stable from source) ---
 maybe_load_modules() {
   # Load if available; ignore if not (HPC-friendly)
@@ -73,7 +102,7 @@ maybe_load_modules() {
 }
 check_build_tools() {
   command -v git   >/dev/null || { echo "git not found."; exit 1; }
-  command -v curl  >/dev/log || true # not strictly required for build
+  command -v curl  >/dev/null || true # not strictly required for build
   command -v cmake >/dev/null || { echo "cmake not found (try: module load cmake)"; exit 1; }
   command -v cc >/dev/null 2>&1 || command -v gcc >/dev/null 2>&1 || { echo "C compiler not found (try: module load gcc)"; exit 1; }
 }
@@ -104,17 +133,27 @@ log "Prefix: $PREFIX"
 install_starship
 install_fzf
 install_antidote
+install_tpm
 build_nvim
 
 cat <<'DONE'
 
 ✅ Done.
 
-Now:
-- Open a new shell (or: source ~/.zshrc) so your PATH/plugins are active.
-- Verify: nvim --version | head -n 5
-- fzf keybindings load from ~/.fzf.zsh (your .zshrc already sources it).
-- Starship prompt is already initialized in your .zshrc.
+Next steps for tmux plugins:
+1) Put your config in: ~/.config/tmux/tmux.conf
+   Make sure the LAST line is:
+     run '~/.config/tmux/plugins/tpm/tpm'
 
-Re-run this script anytime; it updates what's installed without touching your ~/.zshrc.
+2) Start tmux, then press:  Ctrl+b  Shift+I  (to install plugins)
+
+Tips:
+- For Catppuccin Mocha, add to your tmux.conf:
+    set -g @plugin 'catppuccin/tmux'
+    set -g @catppuccin_flavour 'mocha'
+- For remote→local clipboard, include:
+    set -g set-clipboard on
+    set -as terminal-overrides ',*:Ms=\E]52;c;%p1%s\007'
+
+Re-run this script anytime; it updates installed tools without touching your shell rc files.
 DONE

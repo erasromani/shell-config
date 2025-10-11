@@ -1,17 +1,27 @@
 # 🐚 Shell Configuration
 
-This repository contains my personal shell configuration for **Zsh**, designed to be portable across local development and HPC environments. It uses modern tools like **Antidote**, **Starship**, and **fzf** to provide a fast, reproducible setup.
+This repository contains my personal shell configuration for **Zsh**, designed to be portable across local development and HPC environments.  
+It uses modern tools like **Antidote**, **Starship**, **fzf**, and **Neovim** to provide a fast, reproducible developer environment.
 
 ---
 
 ## 📦 Contents
 
 - **`install_cli_tools.sh`**  
-  Bootstrap script to install core CLI tools into user space:
+  Bootstrap script to install all core CLI tools into user space:
 
   - [Starship](https://starship.rs) → `~/.local/bin`
   - [fzf](https://github.com/junegunn/fzf) → `~/.fzf` with binaries in `~/.fzf/bin`
   - [Antidote](https://getantidote.github.io) → `${ZDOTDIR:-$HOME}/.antidote`
+  - [Neovim (built from source)](https://github.com/neovim/neovim) → `~/.local/bin/nvim`
+  - [TPM (tmux Plugin Manager)](https://github.com/tmux-plugins/tpm) → `~/.config/tmux/plugins/tpm`
+
+  Features:
+
+  - Installs everything under `~/.local` and `~/.config` (no sudo required)
+  - Builds Neovim from source (resolves GLIBC/FUSE issues on HPC clusters)
+  - Installs TPM (tmux plugin manager)
+  - HPC-safe, headless, and idempotent — safe to re-run anytime
 
   Optional flag:
 
@@ -20,14 +30,6 @@ This repository contains my personal shell configuration for **Zsh**, designed t
   ```
 
   Appends helpful snippets to your `~/.zshrc`.
-
-- **`setup_dev_min.sh`**  
-  Combined installer for Starship, fzf, Antidote, and the latest stable Neovim build.
-
-  - Installs tools under `~/.local`
-  - Builds Neovim from source (resolves GLIBC/FUSE issues on HPC clusters)
-  - Symlinks `nvim` into `~/.local/bin`
-  - Does **not** modify `.zshrc`
 
 - **`.zshrc`**  
   Interactive shell configuration.
@@ -68,7 +70,123 @@ This repository contains my personal shell configuration for **Zsh**, designed t
   Personal aliases (currently includes `lsa="ls -la"`).
 
 - **`config/`**  
-  Configuration files for related tools: Ghostty, tmux, Starship.
+  Configuration files for related tools: Ghostty, **tmux**, **Starship**, and **Neovim**.
+
+---
+
+## 📝 Neovim Setup
+
+The Neovim configuration lives under `~/.config/nvim`, designed for **HPC-safe**, **user-space**, and **portable** environments (no sudo).
+
+### 🧩 Installation
+
+Neovim is installed via the `install_cli_tools.sh` script:
+
+```bash
+./install_cli_tools.sh
+```
+
+This:
+
+- Builds the latest stable Neovim from source if binaries are incompatible.
+- Installs to `~/.local/` (binary at `~/.local/bin/nvim`).
+- Adds Neovim to your PATH via `.zshenv`.
+
+Verify installation:
+
+```bash
+nvim --version
+```
+
+### ⚙️ Configuration
+
+Create a simple config at:
+
+```bash
+mkdir -p ~/.config/nvim
+nvim ~/.config/nvim/init.lua
+```
+
+Example minimal config:
+
+```lua
+-- ~/.config/nvim/init.lua
+vim.opt.number = true
+vim.opt.relativenumber = false
+vim.opt.termguicolors = true
+vim.opt.mouse = "a"
+
+-- Bootstrap lazy.nvim
+local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
+if not vim.loop.fs_stat(lazypath) then
+  vim.fn.system({
+    "git", "clone", "--filter=blob:none",
+    "https://github.com/folke/lazy.nvim.git",
+    "--branch=stable", lazypath,
+  })
+end
+vim.opt.rtp:prepend(lazypath)
+
+-- Load plugins
+require("lazy").setup({
+  { "catppuccin/nvim", name = "catppuccin", priority = 1000, config = function()
+      require("catppuccin").setup({ flavour = "mocha" })
+      vim.cmd.colorscheme("catppuccin")
+    end
+  },
+  { "nvim-treesitter/nvim-treesitter", build = ":TSUpdate" },
+  { "neovim/nvim-lspconfig" },
+  { "hrsh7th/nvim-cmp" },
+  { "hrsh7th/cmp-nvim-lsp" },
+  { "L3MON4D3/LuaSnip" },
+  { "saadparwaiz1/cmp_luasnip" },
+  { "williamboman/mason.nvim" },
+  { "williamboman/mason-lspconfig.nvim" },
+})
+```
+
+### 🧠 Language Support
+
+The setup supports:
+
+- **Python:** Pyright (LSP), Black, isort, and Mypy via Mason.
+- **C/C++:** Clangd and Clang-Format.
+
+All are installed automatically on first launch via Mason:
+
+```
+:Mason
+```
+
+You can also install them manually:
+
+```bash
+pip install --user black isort mypy
+npm i -g pyright
+conda install -c conda-forge clang clang-tools
+```
+
+### 🎨 Theme
+
+Neovim uses the [Catppuccin Mocha](https://github.com/catppuccin/nvim) colorscheme by default for a soft, modern aesthetic with full terminal color support.
+
+---
+
+## 🖥️ tmux Setup
+
+**tmux** provides a terminal multiplexer with modern features and full integration with Neovim.
+
+- Configuration path: `~/.config/tmux/tmux.conf`
+- Plugins managed by TPM: `~/.config/tmux/plugins/tpm`
+- Recommended theme: [Catppuccin Mocha](https://github.com/catppuccin/tmux)
+- Clipboard integration via OSC52 (works over SSH)
+- Smart pane splitting opens in the current working directory
+
+Install plugins inside tmux with:
+
+```
+Ctrl+b Shift+I
+```
 
 ---
 
@@ -77,16 +195,14 @@ This repository contains my personal shell configuration for **Zsh**, designed t
 1. Clone this repository:
 
    ```bash
-   git clone https://github.com/yourusername/your-repo.git
-   cd your-repo
+   git clone https://github.com/erarsomani/shell-config.git
+   cd shell-config
    ```
 
 2. Run the installer:
 
    ```bash
    ./install_cli_tools.sh --write-zshrc
-   # or, for full setup including Neovim:
-   ./setup_dev_min.sh
    ```
 
 3. Restart your shell (or `source ~/.zshrc`).
@@ -95,9 +211,12 @@ This repository contains my personal shell configuration for **Zsh**, designed t
 
 ## 🛠 Updating
 
-- Re-run `install_cli_tools.sh` anytime to update Starship, fzf, or Antidote.
-- Re-run `setup_dev_min.sh` to rebuild/update Neovim along with the CLI tools.
-- Plugins can be updated with:
+- Re-run `install_cli_tools.sh` anytime to update Starship, fzf, Antidote, Neovim, or TPM.
+- Update Neovim plugins:
+  ```
+  :Lazy sync
+  ```
+- Update Zsh plugins:
   ```bash
   antidote update
   ```
@@ -106,14 +225,16 @@ This repository contains my personal shell configuration for **Zsh**, designed t
 
 ## 🧑‍💻 Notes
 
-- **Portability:** Works across macOS and HPC clusters.
-- **Safety:** No PATH duplication, guarded bindings, and clean Python REPL (`unset PYTHONSTARTUP`).
-- **Extensibility:** Add aliases in `~/.zsh_aliases` and custom functions in `~/.zsh_functions`.
+- **Portability:** Works across macOS, Linux, and HPC clusters.
+- **Safety:** No `sudo` required; installs to `~/.local`.
+- **Extensibility:** Add Neovim plugins in `~/.config/nvim/init.lua` or Zsh plugins in `.zsh_plugins.txt`.
+- **Consistency:** Unified toolchain between local and HPC environments.
 
 ---
 
 ## 📸 Demo
 
-Starship + autosuggestions + syntax highlighting + fzf completions make for a clean, modern shell experience ✨
+Starship prompt + autosuggestions + syntax highlighting + fzf + Neovim + tmux (Catppuccin Mocha) =  
+a cohesive, modern, and portable developer environment ✨
 
 ---
