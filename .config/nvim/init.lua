@@ -79,6 +79,7 @@ require("mason-tool-installer").setup({
     "clang-format",
     -- Linters / type-checkers
     "mypy",
+    "flake8",
   },
   run_on_start = true,
   auto_update = false,
@@ -159,7 +160,7 @@ vim.keymap.set({ "n", "v" }, "<leader>f", function() require("conform").format({
 -----------------------------------------------------------
 local lint = require("lint")
 lint.linters_by_ft = {
-  python = { "mypy" },
+  python = { "flake8", "mypy" },
 }
 -- If mypy is in a non-standard path, you can set:
 -- lint.linters.mypy.cmd = "/path/to/mypy"
