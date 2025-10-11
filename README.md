@@ -106,7 +106,7 @@ This repository contains my personal shell configuration for **Zsh**, designed t
 
 ## 🧑‍💻 Notes
 
-- **Portability:** Works across macOS and HPC clusters (e.g., NYU Big Purple).
+- **Portability:** Works across macOS and HPC clusters.
 - **Safety:** No PATH duplication, guarded bindings, and clean Python REPL (`unset PYTHONSTARTUP`).
 - **Extensibility:** Add aliases in `~/.zsh_aliases` and custom functions in `~/.zsh_functions`.
 
