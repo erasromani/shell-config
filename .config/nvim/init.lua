@@ -1,13 +1,12 @@
 -- ~/.config/nvim/init.lua
 -- =====================================================================
---  Neovim best‑practice config for Python/C/C++ on HPC (no Node needed)
---  - Plugin manager: lazy.nvim
---  - LSP: BasedPyright (types), Ruff (lint/fixes), clangd
---  - Format: black/isort, clang-format via conform.nvim
---  - Type check: mypy via nvim-lint
---  - UI/UX: Catppuccin, Telescope, Treesitter, sane defaults
---  - Sidebar: <leader>e opens NetRW (built-in) or nvim-tree if installed
---  - Compatible with nvim 0.11+ (new LSP API) and gracefully falls back to lspconfig
+--  Neovim best‑practice config (HPC‑friendly, no Node required)
+--  • Dynamic Python venv detection (VIRTUAL_ENV, Conda, .venv/venv)
+--  • LSP: BasedPyright (typing), Ruff LSP (lint/fix), clangd
+--  • Format: black/isort, clang-format via conform.nvim (uses venv)
+--  • Type check: mypy via nvim-lint (runs `python -m mypy` in venv)
+--  • UI/UX: Catppuccin, Telescope, Treesitter, sane defaults
+--  • Works on nvim 0.11+ (new LSP API) and falls back to lspconfig
 -- =====================================================================
 
 -----------------------------------------------------------
@@ -24,7 +23,7 @@ end
 vim.opt.rtp:prepend(lazypath)
 
 -----------------------------------------------------------
--- Plugins
+-- Plugins (minimal, HPC‑friendly; no Node needed)
 -----------------------------------------------------------
 require("lazy").setup({
   -- Theme
@@ -33,7 +32,7 @@ require("lazy").setup({
   -- LSP + tooling
   { "williamboman/mason.nvim" },
   { "WhoIsSethDaniel/mason-tool-installer.nvim" },
-  { "neovim/nvim-lspconfig" }, -- used as a fallback on nvim < 0.11
+  { "neovim/nvim-lspconfig" }, -- fallback on nvim < 0.11
 
   -- Completion
   { "hrsh7th/nvim-cmp" },
@@ -59,7 +58,7 @@ require("lazy").setup({
 -----------------------------------------------------------
 -- Basic Options (UX defaults)
 -----------------------------------------------------------
-vim.g.mapleader = " "           -- Space as leader
+vim.g.mapleader = " "
 vim.opt.number = true
 vim.opt.relativenumber = false
 vim.opt.mouse = "a"
@@ -69,6 +68,11 @@ vim.opt.signcolumn = "yes"
 vim.opt.splitright = true
 vim.opt.splitbelow = true
 vim.opt.completeopt = { "menu", "menuone", "noselect" }
+vim.opt.tabstop = 4        -- number of visual spaces per TAB
+vim.opt.shiftwidth = 4     -- spaces per indentation level
+vim.opt.softtabstop = 4    -- number of spaces in a tab when editing
+vim.opt.expandtab = true   -- convert tabs to spaces
+vim.opt.smartindent = true -- autoindent new lines
 
 -- Theme: Catppuccin Mocha
 require("catppuccin").setup({ flavour = "mocha" })
@@ -105,7 +109,57 @@ require("mason-tool-installer").setup({
 })
 
 -----------------------------------------------------------
--- nvim-cmp (completion)
+-- Python venv auto-detect (VIRTUAL_ENV, Conda, .venv, venv)
+-----------------------------------------------------------
+local function detect_python()
+  local uv = vim.loop
+  local env = vim.env
+  local candidates = {}
+
+  -- 1) Activated venv (virtualenv/uv/poetry) via $VIRTUAL_ENV
+  if env.VIRTUAL_ENV and env.VIRTUAL_ENV ~= "" then
+    table.insert(candidates, env.VIRTUAL_ENV)
+  end
+
+  -- 2) Activated Conda env (not base)
+  if env.CONDA_PREFIX and env.CONDA_PREFIX ~= "" then
+    table.insert(candidates, env.CONDA_PREFIX)
+  end
+
+  -- 3) Project-local .venv/ or venv/ near root
+  local root_markers = { ".git", "pyproject.toml", "setup.cfg", "setup.py", "requirements.txt" }
+  local root = vim.fs.root(0, root_markers) or uv.cwd()
+  for _, name in ipairs({ ".venv", "venv", ".conda" }) do
+    local p = root .. "/" .. name
+    local st = uv.fs_stat(p)
+    if st and st.type == "directory" then
+      table.insert(candidates, p)
+    end
+  end
+
+  for _, venv in ipairs(candidates) do
+    local py = venv .. "/bin/python"
+    if uv.fs_stat(py) then
+      return venv, py
+    end
+  end
+
+  -- Fallback to whatever "python3" or "python" resolves to
+  local exepath = vim.fn.exepath("python3")
+  if exepath == "" then exepath = vim.fn.exepath("python") end
+  return nil, exepath
+end
+
+-- Resolve once on startup
+local VENV_PATH, PYTHON_BIN = detect_python()
+
+-- Make Neovim's own Python host use the same interpreter (for pynvim plugins)
+if PYTHON_BIN and PYTHON_BIN ~= "" then
+  vim.g.python3_host_prog = PYTHON_BIN
+end
+
+-----------------------------------------------------------
+-- Completion (nvim-cmp)
 -----------------------------------------------------------
 local cmp = require("cmp")
 local luasnip = require("luasnip")
@@ -137,27 +191,42 @@ vim.diagnostic.config({
 })
 
 -----------------------------------------------------------
--- LSP setup
---  - Uses new API on nvim >= 0.11
---  - Falls back to lspconfig on older versions
+-- LSP setup (dynamic Python/venv)
 -----------------------------------------------------------
 local is_nvim_011 = vim.fn.has("nvim-0.11") == 1
 
+-- Helper to produce Pyright/BasedPyright settings from detected venv
+local function py_settings_from_venv(venv_path)
+  if not venv_path or venv_path == "" then
+    return {} -- let server try its own detection
+  end
+  local venv_dir  = vim.fn.fnamemodify(venv_path, ":h") -- parent folder
+  local venv_name = vim.fn.fnamemodify(venv_path, ":t") -- leaf name (.venv)
+  return { python = { venvPath = venv_dir, venv = venv_name } }
+end
+
+local bp_settings = py_settings_from_venv(VENV_PATH)
+
 if is_nvim_011 and vim.lsp and vim.lsp.config then
-  -- New Neovim 0.11+ API
-  -- BasedPyright (Python typing)
+  -- Neovim 0.11+ API
   vim.lsp.config("basedpyright", {
     capabilities = capabilities,
     cmd = { "basedpyright-langserver", "--stdio" },
+    settings = bp_settings,
+    on_init = function(client)
+      client.config.settings = vim.tbl_deep_extend("force", client.config.settings or {}, {
+        python = { pythonPath = PYTHON_BIN },
+      })
+    end,
   })
   vim.lsp.enable("basedpyright")
 
-  -- Ruff (Python lint/fixes) – avoid overlap with Pyright hovers/signatures
   vim.lsp.config("ruff", {
     capabilities = capabilities,
     cmd = { "ruff", "server" },
     init_options = {
       settings = {
+        interpreter = PYTHON_BIN,
         hover = { enable = false },
         signatureHelp = { enable = false },
         codeAction = {
@@ -169,7 +238,6 @@ if is_nvim_011 and vim.lsp and vim.lsp.config then
   })
   vim.lsp.enable("ruff")
 
-  -- clangd (C/C++)
   vim.lsp.config("clangd", {
     capabilities = capabilities,
     cmd = { "clangd" },
@@ -182,12 +250,20 @@ else
   lspconfig.basedpyright.setup({
     capabilities = capabilities,
     cmd = { "basedpyright-langserver", "--stdio" },
+    settings = bp_settings,
+    on_init = function(client)
+      client.config.settings = vim.tbl_deep_extend("force", client.config.settings or {}, {
+        python = { pythonPath = PYTHON_BIN },
+      })
+    end,
   })
+
   lspconfig.ruff.setup({
     capabilities = capabilities,
     cmd = { "ruff", "server" },
     init_options = {
       settings = {
+        interpreter = PYTHON_BIN,
         hover = { enable = false },
         signatureHelp = { enable = false },
         codeAction = {
@@ -197,11 +273,13 @@ else
       },
     },
   })
+
   lspconfig.clangd.setup({ capabilities = capabilities })
 end
 
 -----------------------------------------------------------
--- Formatting (Conform): <leader>f and on-save for common filetypes
+-- Formatting (Conform): on-save for common filetypes
+-- Force using tools from the detected Python via `python -m`
 -----------------------------------------------------------
 require("conform").setup({
   notify_on_error = false,
@@ -217,26 +295,50 @@ require("conform").setup({
     c      = { "clang-format" },
     cpp    = { "clang-format" },
   },
+  formatters = {
+    black = {
+      command = PYTHON_BIN,
+      args = { "-m", "black", "--quiet", "-" },
+      stdin = true,
+    },
+    isort = {
+      command = PYTHON_BIN,
+      args = { "-m", "isort", "--stdout", "-" },
+      stdin = true,
+    },
+  },
 })
 vim.keymap.set({ "n", "v" }, "<leader>f", function()
   require("conform").format({ async = true })
 end, { desc = "Format buffer/range" })
 
 -----------------------------------------------------------
--- Linting / Type-check (nvim-lint) — mypy for Python
+-- Linting / Type-check (nvim-lint) — mypy with venv python
 -----------------------------------------------------------
 local lint = require("lint")
 lint.linters_by_ft = { python = { "mypy" } }
--- If mypy is in a non-standard path, set: lint.linters.mypy.cmd = vim.fn.expand("~/.local/bin/mypy")
+
+-- Run mypy as a module inside the selected interpreter
+lint.linters.mypy = vim.tbl_deep_extend("force", lint.linters.mypy or {}, {
+  cmd = PYTHON_BIN,
+  args = {
+    "-m", "mypy",
+    "--show-column-numbers",
+    "--ignore-missing-imports",
+    "--pretty",
+    "--no-error-summary",
+  },
+  stdin = false,
+})
+
 vim.api.nvim_create_autocmd({ "BufEnter", "BufWritePost", "InsertLeave" }, {
   callback = function() require("lint").try_lint() end,
 })
 
 -----------------------------------------------------------
 -- Sidebar / File Navigation
--- <leader>e opens NetRW on the LEFT (best practice); if nvim-tree is installed, toggle that
+-- <leader>e opens NetRW on the LEFT; if nvim-tree installed, toggle it
 -----------------------------------------------------------
--- NetRW defaults (lightweight, built-in)
 vim.g.netrw_banner = 0
 vim.g.netrw_browse_split = 0
 vim.g.netrw_winsize = 25
@@ -254,7 +356,6 @@ vim.keymap.set("n", "<leader>e", function()
   end
 end, { desc = "Toggle sidebar (nvim-tree or NetRW)", silent = true })
 
--- Optional: minimal nvim-tree setup (only if installed)
 if plugin_loaded("nvim-tree") then
   require("nvim-tree").setup({
     view = { side = "left", width = 30 },
@@ -270,11 +371,7 @@ end
 -----------------------------------------------------------
 -- Terminal (bottom split)
 -----------------------------------------------------------
--- Open a terminal in a horizontal split at the bottom
 vim.keymap.set("n", "<leader>t", ":belowright split | terminal<CR>", { desc = "Open terminal at bottom", silent = true })
--- Tip: in terminal, use <C-\\><C-n> to return to Normal mode
-
--- Allow Esc to exit terminal mode
 vim.keymap.set("t", "<Esc>", [[<C-\><C-n>]], { silent = true, desc = "Exit terminal mode" })
 
 -----------------------------------------------------------
@@ -290,6 +387,38 @@ if ok_telescope then
 end
 
 -----------------------------------------------------------
--- Python provider (optional): point to a specific interpreter
--- vim.g.python3_host_prog = "/path/to/conda/envs/neovim/bin/python"
+-- Utility: Manual venv re-detect & restart Python LSPs (no autocmd)
 -----------------------------------------------------------
+local function restart_python_lsps()
+  local clients = vim.lsp.get_active_clients({ bufnr = 0 })
+  for _, c in ipairs(clients) do
+    if c.name == "basedpyright" or c.name == "ruff" then
+      c.stop(true)
+    end
+  end
+  -- Delay slightly to avoid race with shutdown
+  vim.defer_fn(function()
+    if is_nvim_011 and vim.lsp and vim.lsp.enable then
+      pcall(vim.lsp.enable, "basedpyright")
+      pcall(vim.lsp.enable, "ruff")
+    else
+      local lspconfig = require("lspconfig")
+      pcall(lspconfig.basedpyright.manager.try_add)
+      pcall(lspconfig.ruff.manager.try_add)
+    end
+  end, 100)
+end
+
+-- Manual command: run this if you change projects mid-session
+vim.api.nvim_create_user_command("PyVenvDetect", function()
+  local old_venv, old_py = VENV_PATH, PYTHON_BIN
+  VENV_PATH, PYTHON_BIN = detect_python()
+  if PYTHON_BIN and PYTHON_BIN ~= "" then
+    vim.g.python3_host_prog = PYTHON_BIN
+  end
+  vim.notify(("Detected python: %s\nvenv: %s"):format(PYTHON_BIN or "<none>", VENV_PATH or "<none>"), vim.log.levels.INFO)
+  if PYTHON_BIN ~= old_py then
+    restart_python_lsps()
+  end
+end, { desc = "Detect Python venv and restart Python LSPs" })
+
