@@ -68,11 +68,13 @@ vim.opt.signcolumn = "yes"
 vim.opt.splitright = true
 vim.opt.splitbelow = true
 vim.opt.completeopt = { "menu", "menuone", "noselect" }
-vim.opt.tabstop = 4        -- number of visual spaces per TAB
-vim.opt.shiftwidth = 4     -- spaces per indentation level
-vim.opt.softtabstop = 4    -- number of spaces in a tab when editing
-vim.opt.expandtab = true   -- convert tabs to spaces
-vim.opt.smartindent = true -- autoindent new lines
+
+-- Global indentation defaults (applies to most files)
+vim.opt.tabstop = 4
+vim.opt.shiftwidth = 4
+vim.opt.softtabstop = 4
+vim.opt.expandtab = true
+vim.opt.smartindent = true
 
 -- Theme: Catppuccin Mocha
 require("catppuccin").setup({ flavour = "mocha" })
@@ -422,3 +424,34 @@ vim.api.nvim_create_user_command("PyVenvDetect", function()
   end
 end, { desc = "Detect Python venv and restart Python LSPs" })
 
+-----------------------------------------------------------
+-- Filetype-specific indentation
+-----------------------------------------------------------
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = { "python" },
+  callback = function()
+    vim.opt_local.tabstop = 4
+    vim.opt_local.shiftwidth = 4
+    vim.opt_local.softtabstop = 4
+    vim.opt_local.expandtab = true
+  end,
+})
+
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = { "c", "cpp" },
+  callback = function()
+    vim.opt_local.tabstop = 2
+    vim.opt_local.shiftwidth = 2
+    vim.opt_local.softtabstop = 2
+    vim.opt_local.expandtab = true
+  end,
+})
+
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = { "make" },
+  callback = function()
+    vim.opt_local.expandtab = false  -- use literal tabs
+    vim.opt_local.tabstop = 8        -- display width of a tab
+    vim.opt_local.shiftwidth = 8     -- match visual width
+  end,
+})
